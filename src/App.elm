@@ -1,10 +1,58 @@
 module App exposing (..)
 
 import HipstoreUI exposing (Product)
-import Html exposing (Html, div)
+import Html exposing (Html, div, text)
 import Http exposing (emptyBody, expectJson)
 import Json.Decode exposing (Decoder)
-import RemoteData exposing (WebData)
+import Navigation exposing (Location)
+import RemoteData exposing (WebData, isLoading)
+import Route exposing ((:=), match)
+
+
+--- Router ---
+
+
+type Page
+    = Home
+    | Cart
+    | NotFound
+
+
+routeParsers =
+    { home = Home := Route.static ""
+    , cart = Cart := Route.static "#cart"
+    }
+
+
+router : Route.Router Page
+router =
+    Route.router
+        [ routeParsers.home
+        , routeParsers.cart
+        ]
+
+
+routeFromLocation : Location -> Page
+routeFromLocation location =
+    (location.pathname ++ location.hash)
+        |> match router
+        |> Maybe.withDefault NotFound
+
+
+navigateTo : Page -> Cmd msg
+navigateTo page =
+    (case page of
+        Home ->
+            Route.reverse routeParsers.home []
+
+        Cart ->
+            Route.reverse routeParsers.cart []
+
+        NotFound ->
+            "/"
+    )
+        |> Navigation.newUrl
+
 
 
 --- Decoders ---
@@ -82,13 +130,19 @@ removeFromCart id =
 type alias Model =
     { products : WebData (List HipstoreUI.Product)
     , cart : WebData (List HipstoreUI.Product)
+    , location : Navigation.Location
+    , activePage : Page
+    , isLoading : Bool
     }
 
 
-init : ( Model, Cmd Msg )
-init =
+init : Navigation.Location -> ( Model, Cmd Msg )
+init location =
     ( { products = RemoteData.Loading
       , cart = RemoteData.Loading
+      , location = location
+      , activePage = Home
+      , isLoading = True
       }
     , Cmd.batch [ getProducts, getCart ]
     )
@@ -104,45 +158,69 @@ type Msg
     | CartChanged (WebData (List Product))
     | AddToCart String
     | RemoveFromCart String
+    | LocationChanged Location
+    | NavigateTo Page
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
+    case Debug.log "msg: " msg of
         NoOp ->
             model ! []
 
         ProductsChanged newWebData ->
-            { model | products = newWebData } ! []
+            { model
+                | products = newWebData
+                , isLoading = False
+            }
+                ! []
 
         CartChanged newWebData ->
-            { model | cart = newWebData } ! []
+            { model
+                | cart = newWebData
+                , isLoading = False
+            }
+                ! []
 
         AddToCart id ->
-            model ! [ addToCart id ]
+            { model | isLoading = True } ! [ addToCart id ]
 
         RemoveFromCart id ->
-            model ! [ removeFromCart id ]
+            { model | isLoading = True } ! [ removeFromCart id ]
+
+        LocationChanged loc ->
+            { model | location = loc, activePage = routeFromLocation loc } ! []
+
+        NavigateTo page ->
+            model ! [ navigateTo page ]
 
 
 
 ---- VIEW ----
 
 
-uiConfig : HipstoreUI.Config Msg
-uiConfig =
+uiConfig : Location -> HipstoreUI.Config Msg
+uiConfig location =
     { onAddToCart = AddToCart
     , onRemoveFromCart = RemoveFromCart
-    , onClickViewCart = NoOp
-    , onClickViewProducts = NoOp
+    , onClickViewCart = NavigateTo Cart
+    , onClickViewProducts = NavigateTo Home
+    , location = location
     }
 
 
 view : Model -> Html Msg
 view model =
     div []
-        [ HipstoreUI.products uiConfig model.products model.cart
-        , HipstoreUI.cart uiConfig model.cart
+        [ case model.activePage of
+            Home ->
+                HipstoreUI.products (uiConfig model.location) model.isLoading model.products model.cart
+
+            Cart ->
+                HipstoreUI.cart (uiConfig model.location) model.isLoading model.cart
+
+            NotFound ->
+                div [] [ text "Sorry, nothing here :(" ]
         ]
 
 
@@ -152,7 +230,7 @@ view model =
 
 main : Program Never Model Msg
 main =
-    Html.program
+    Navigation.program LocationChanged
         { view = view
         , init = init
         , update = update

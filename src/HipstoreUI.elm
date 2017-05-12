@@ -1,13 +1,22 @@
 module HipstoreUI exposing (Product, Config, products, cart)
 
-import Bootstrap.Button
+{-| A tiny collection of UI functions made bespoke for Splodingsocks's Elm workshop.
+
+# Types
+@docs Product, Config
+
+# Views
+@docs products, cart
+-}
+
+import Bootstrap.Button exposing (onClick)
 import Bootstrap.CDN
 import Bootstrap.Card as Card
+import CDN
 import Html exposing (..)
-import Html.Attributes exposing (href, src, style)
-import Html.Events exposing (onClick)
+import Html.Attributes exposing (class, href, src, style)
 import Navigation exposing (Location)
-import RemoteData exposing (RemoteData(..), WebData)
+import RemoteData exposing (RemoteData(..), WebData, isLoading)
 
 
 url : String
@@ -15,6 +24,8 @@ url =
     "https://hipstore.now.sh/"
 
 
+{-| A Product isn't too complex. It's got an id, a name, an image, and it costs a few tacos. Yum, 🌮s.
+-}
 type alias Product =
     { id : String
     , displayName : String
@@ -23,12 +34,28 @@ type alias Product =
     }
 
 
+{-| The config contains functions and messages that the UI can use to send messages to the update function,
+as well as some other necessary information for rendering the rest of the UI.
+-}
 type alias Config msg =
     { onAddToCart : String -> msg
     , onRemoveFromCart : String -> msg
     , onClickViewCart : msg
     , onClickViewProducts : msg
+    , location : Navigation.Location
     }
+
+
+fakeNavBar : Navigation.Location -> Html msg
+fakeNavBar location =
+    div
+        [ style
+            [ ( "background", "#ECEFF1" )
+            , ( "color", "#455A64" )
+            , ( "padding", "0.5rem" )
+            ]
+        ]
+        [ text "path and hash: ", text location.pathname, text location.hash ]
 
 
 product : Config msg -> Product -> Html msg
@@ -50,7 +77,8 @@ product config p =
             ]
         |> Card.footer []
             [ Bootstrap.Button.button
-                [ Bootstrap.Button.attrs [ onClick <| config.onAddToCart p.id, style [ ( "margin-top", "auto" ) ] ]
+                [ Bootstrap.Button.attrs [ style [ ( "margin-top", "auto" ) ] ]
+                , onClick <| config.onAddToCart p.id
                 , Bootstrap.Button.secondary
                 , Bootstrap.Button.block
                 ]
@@ -59,16 +87,30 @@ product config p =
         |> Card.view
 
 
-products : Config msg -> WebData (List Product) -> WebData (List Product) -> Html msg
-products config productsWD cartWD =
+loadingIndicator : Bool -> Html msg
+loadingIndicator isLoading =
+    if isLoading then
+        i [ class "fa fa-spin fa-cog", style [ ( "font-size", "2em" ), ( "margin-right", "1rem" ) ] ] []
+    else
+        text ""
+
+
+{-| This function will render a nice, full-page view of the products that are passed into it.
+The second argument, the bool, represents whether or not something is currently loading (for rendering a nice loading indicator.) The third argument is a WebData of the Products, and the fourth is a WebData of the products currently in the cart.
+-}
+products : Config msg -> Bool -> WebData (List Product) -> WebData (List Product) -> Html msg
+products config isLoading productsWD cartWD =
     div
         [ style
             [ ( "display", "grid" )
-            , ( "grid-template-rows", "min-content 1fr min-content" )
+            , ( "grid-template-rows", "min-content min-content 1fr min-content" )
             , ( "height", "100vh" )
+            , ( "color", "#616161" )
             ]
         ]
         [ Bootstrap.CDN.stylesheet
+        , .css CDN.fontAwesome
+        , fakeNavBar config.location
         , div
             [ style
                 [ ( "display", "flex" )
@@ -79,7 +121,11 @@ products config productsWD cartWD =
                 ]
             ]
             [ h4 [ style [ ( "flex", "1" ) ] ] [ text "Products" ]
-            , Bootstrap.Button.button [ Bootstrap.Button.secondary ]
+            , loadingIndicator isLoading
+            , Bootstrap.Button.button
+                [ Bootstrap.Button.secondary
+                , Bootstrap.Button.onClick config.onClickViewCart
+                ]
                 [ text "\x1F6D2"
                 , case RemoteData.toMaybe cartWD of
                     Just cart ->
@@ -142,25 +188,31 @@ productInCart config p =
         , span [ style [ ( "align-self", "center" ) ] ] [ text (toString p.tacos), text "\x1F32E" ]
         , Bootstrap.Button.button
             [ Bootstrap.Button.attrs
-                [ onClick <| config.onRemoveFromCart p.id
-                , style [ ( "align-self", "center" ) ]
+                [ style [ ( "align-self", "center" ) ]
                 ]
+            , onClick <| config.onRemoveFromCart p.id
             , Bootstrap.Button.danger
             ]
             [ text "Nope" ]
         ]
 
 
-cart : Config msg -> WebData (List Product) -> Html msg
-cart config cartWD =
+{-| This function will render a nice, full-page cart view of the products that are passed into it.
+The second argument, the bool, represents whether or not something is currently loading (for rendering a nice loading indicator.) The third argument is a WebData of the products currently in the cart.
+-}
+cart : Config msg -> Bool -> WebData (List Product) -> Html msg
+cart config isLoading cartWD =
     div
         [ style
             [ ( "display", "grid" )
-            , ( "grid-template-rows", "min-content 1fr min-content" )
+            , ( "grid-template-rows", "min-content min-content 1fr min-content" )
             , ( "height", "100vh" )
+            , ( "color", "#616161" )
             ]
         ]
         [ Bootstrap.CDN.stylesheet
+        , .css CDN.fontAwesome
+        , fakeNavBar config.location
         , div
             [ style
                 [ ( "display", "flex" )
@@ -171,7 +223,11 @@ cart config cartWD =
                 ]
             ]
             [ h4 [ style [ ( "flex", "1" ) ] ] [ text "Cart" ]
-            , Bootstrap.Button.button [ Bootstrap.Button.secondary ]
+            , loadingIndicator isLoading
+            , Bootstrap.Button.button
+                [ Bootstrap.Button.secondary
+                , Bootstrap.Button.onClick config.onClickViewProducts
+                ]
                 [ text "Back to Products"
                 ]
             ]
@@ -228,9 +284,3 @@ cart config cartWD =
                 ]
             ]
         ]
-
-
-locationBar : Location -> Html msg
-locationBar loc =
-    div []
-        [ text <| "The current path is: " ++ loc.hash ]
