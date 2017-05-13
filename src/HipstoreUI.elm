@@ -15,7 +15,6 @@ import Bootstrap.Card as Card
 import CDN
 import Html exposing (..)
 import Html.Attributes exposing (class, href, src, style)
-import Navigation exposing (Location)
 import RemoteData exposing (RemoteData(..), WebData, isLoading)
 
 
@@ -115,23 +114,10 @@ type alias Config msg =
     , onRemoveFromCart : String -> msg
     , onClickViewCart : msg
     , onClickViewProducts : msg
-    , location : Navigation.Location
     , products : WebData (List Product)
     , cart : WebData (List Product)
     , loadingIndicator : Bool
     }
-
-
-fakeNavBar : Navigation.Location -> Html msg
-fakeNavBar location =
-    div
-        [ style
-            [ ( "background", "#ECEFF1" )
-            , ( "color", "#455A64" )
-            , ( "padding", "0.5rem" )
-            ]
-        ]
-        [ text "path and hash: ", text location.pathname, text location.hash ]
 
 
 product : Config msg -> Product -> Html msg
@@ -177,7 +163,6 @@ products config =
             ]
         ]
         [ theme config.loadingIndicator
-        , fakeNavBar config.location
         , div
             [ style
                 [ ( "display", "flex" )
@@ -277,7 +262,6 @@ cart config =
             ]
         ]
         [ theme config.loadingIndicator
-        , fakeNavBar config.location
         , div
             [ style
                 [ ( "display", "flex" )

@@ -130,7 +130,6 @@ removeFromCart id =
 type alias Model =
     { products : WebData (List HipstoreUI.Product)
     , cart : WebData (List HipstoreUI.Product)
-    , location : Navigation.Location
     , activePage : Page
     , isLoading : Bool
     }
@@ -140,7 +139,6 @@ init : Navigation.Location -> ( Model, Cmd Msg )
 init location =
     ( { products = RemoteData.Loading
       , cart = RemoteData.Loading
-      , location = location
       , activePage = Home
       , isLoading = True
       }
@@ -189,7 +187,7 @@ update msg model =
             { model | isLoading = True } ! [ removeFromCart id ]
 
         LocationChanged loc ->
-            { model | location = loc, activePage = routeFromLocation loc } ! []
+            { model | activePage = routeFromLocation loc } ! []
 
         NavigateTo page ->
             model ! [ navigateTo page ]
@@ -205,7 +203,6 @@ uiConfig model =
     , onRemoveFromCart = RemoveFromCart
     , onClickViewCart = NavigateTo Cart
     , onClickViewProducts = NavigateTo Home
-    , location = model.location
     , products = model.products
     , cart = model.cart
     , loadingIndicator = True
