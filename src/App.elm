@@ -199,13 +199,16 @@ update msg model =
 ---- VIEW ----
 
 
-uiConfig : Location -> HipstoreUI.Config Msg
-uiConfig location =
+uiConfig : Model -> HipstoreUI.Config Msg
+uiConfig model =
     { onAddToCart = AddToCart
     , onRemoveFromCart = RemoveFromCart
     , onClickViewCart = NavigateTo Cart
     , onClickViewProducts = NavigateTo Home
-    , location = location
+    , location = model.location
+    , products = model.products
+    , cart = model.cart
+    , loadingIndicator = True
     }
 
 
@@ -214,10 +217,10 @@ view model =
     div []
         [ case model.activePage of
             Home ->
-                HipstoreUI.products (uiConfig model.location) model.isLoading model.products model.cart
+                HipstoreUI.products <| uiConfig model
 
             Cart ->
-                HipstoreUI.cart (uiConfig model.location) model.isLoading model.cart
+                HipstoreUI.cart <| uiConfig model
 
             NotFound ->
                 div [] [ text "Sorry, nothing here :(" ]

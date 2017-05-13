@@ -24,6 +24,79 @@ url =
     "https://hipstore.now.sh/"
 
 
+theme : Bool -> Html msg
+theme showLoadingIndicator =
+    let
+        paceConfig =
+            Html.node "script" [] [ text """
+window.paceOptions = {
+    ajax: {
+        trackMethods: ["GET", "POST", "PUT", "DELETE", "REMOVE"]
+    },
+    restartOnRequestAfter: true
+};
+
+        """ ]
+
+        paceTheme =
+            Html.node "style" [] [ text """
+.pace {
+  -webkit-pointer-events: none;
+  pointer-events: none;
+
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+
+  -webkit-transform: translate3d(0, -50px, 0);
+  -ms-transform: translate3d(0, -50px, 0);
+  transform: translate3d(0, -50px, 0);
+
+  -webkit-transition: -webkit-transform .5s ease-out;
+  -ms-transition: -webkit-transform .5s ease-out;
+  transition: transform .5s ease-out;
+}
+
+.pace.pace-active {
+  -webkit-transform: translate3d(0, 0, 0);
+  -ms-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+}
+
+.pace .pace-progress {
+  display: block;
+  position: fixed;
+  z-index: 2000;
+  top: 0;
+  right: 100%;
+  width: 100%;
+  height: 10px;
+  background: #8776dd;
+
+  pointer-events: none;
+}        """ ]
+
+        loading =
+            if showLoadingIndicator then
+                [ paceConfig
+                , Html.node "script" [ Html.Attributes.src "https://cdnjs.cloudflare.com/ajax/libs/pace/1.0.2/pace.min.js" ] []
+                , paceTheme
+                ]
+            else
+                [ text "" ]
+    in
+        span [] <|
+            [ Bootstrap.CDN.stylesheet
+            , .css CDN.fontAwesome
+            ]
+                ++ loading
+
+
 {-| A Product isn't too complex. It's got an id, a name, an image, and it costs a few tacos. Yum, 🌮s.
 -}
 type alias Product =
@@ -43,6 +116,9 @@ type alias Config msg =
     , onClickViewCart : msg
     , onClickViewProducts : msg
     , location : Navigation.Location
+    , products : WebData (List Product)
+    , cart : WebData (List Product)
+    , loadingIndicator : Bool
     }
 
 
@@ -87,19 +163,11 @@ product config p =
         |> Card.view
 
 
-loadingIndicator : Bool -> Html msg
-loadingIndicator isLoading =
-    if isLoading then
-        i [ class "fa fa-spin fa-cog", style [ ( "font-size", "2em" ), ( "margin-right", "1rem" ) ] ] []
-    else
-        text ""
-
-
 {-| This function will render a nice, full-page view of the products that are passed into it.
 The second argument, the bool, represents whether or not something is currently loading (for rendering a nice loading indicator.) The third argument is a WebData of the Products, and the fourth is a WebData of the products currently in the cart.
 -}
-products : Config msg -> Bool -> WebData (List Product) -> WebData (List Product) -> Html msg
-products config isLoading productsWD cartWD =
+products : Config msg -> Html msg
+products config =
     div
         [ style
             [ ( "display", "grid" )
@@ -108,8 +176,7 @@ products config isLoading productsWD cartWD =
             , ( "color", "#616161" )
             ]
         ]
-        [ Bootstrap.CDN.stylesheet
-        , .css CDN.fontAwesome
+        [ theme config.loadingIndicator
         , fakeNavBar config.location
         , div
             [ style
@@ -121,13 +188,12 @@ products config isLoading productsWD cartWD =
                 ]
             ]
             [ h4 [ style [ ( "flex", "1" ) ] ] [ text "Products" ]
-            , loadingIndicator isLoading
             , Bootstrap.Button.button
                 [ Bootstrap.Button.secondary
                 , Bootstrap.Button.onClick config.onClickViewCart
                 ]
                 [ text "\x1F6D2"
-                , case RemoteData.toMaybe cartWD of
+                , case RemoteData.toMaybe config.cart of
                     Just cart ->
                         text <| " " ++ (toString <| List.length cart) ++ " items"
 
@@ -142,7 +208,7 @@ products config isLoading productsWD cartWD =
                 , ( "padding-bottom", "2rem" )
                 ]
             ]
-            [ case productsWD of
+            [ case config.products of
                 NotAsked ->
                     text "Waiting to be told to load."
 
@@ -200,8 +266,8 @@ productInCart config p =
 {-| This function will render a nice, full-page cart view of the products that are passed into it.
 The second argument, the bool, represents whether or not something is currently loading (for rendering a nice loading indicator.) The third argument is a WebData of the products currently in the cart.
 -}
-cart : Config msg -> Bool -> WebData (List Product) -> Html msg
-cart config isLoading cartWD =
+cart : Config msg -> Html msg
+cart config =
     div
         [ style
             [ ( "display", "grid" )
@@ -210,8 +276,7 @@ cart config isLoading cartWD =
             , ( "color", "#616161" )
             ]
         ]
-        [ Bootstrap.CDN.stylesheet
-        , .css CDN.fontAwesome
+        [ theme config.loadingIndicator
         , fakeNavBar config.location
         , div
             [ style
@@ -223,7 +288,6 @@ cart config isLoading cartWD =
                 ]
             ]
             [ h4 [ style [ ( "flex", "1" ) ] ] [ text "Cart" ]
-            , loadingIndicator isLoading
             , Bootstrap.Button.button
                 [ Bootstrap.Button.secondary
                 , Bootstrap.Button.onClick config.onClickViewProducts
@@ -237,7 +301,7 @@ cart config isLoading cartWD =
                 , ( "overflow", "scroll" )
                 ]
             ]
-            [ case cartWD of
+            [ case config.cart of
                 NotAsked ->
                     text "Waiting to be told to load."
 
@@ -269,7 +333,7 @@ cart config isLoading cartWD =
             ]
             [ span []
                 [ text "Total: "
-                , case RemoteData.toMaybe cartWD of
+                , case RemoteData.toMaybe config.cart of
                     Just cart ->
                         let
                             count =
