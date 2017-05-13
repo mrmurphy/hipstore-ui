@@ -1,5 +1,5 @@
 {
-    "version": "2.0.0",
+    "version": "3.0.0",
     "summary": "Functions to render the UI for an Elm training session.",
     "repository": "https://github.com/splodingsocks/hipstore-ui.git",
     "license": "BSD3",
